@@ -150,9 +150,9 @@ class deepdir(object):
             return self
 
         def exclude_common(self, commons: list, special_cases=('__doc__',)):
-            excludes = []
+            excludes = set()
             for common in commons:
-                excludes.extend(eval('dir({})'.format(common)))
+                excludes.update(eval('dir({})'.format(common)))
             for case in special_cases:
                 excludes.remove(case)
             exclude_pattern = '|'.join(excludes)
@@ -215,7 +215,7 @@ class deepdir(object):
        
 def generate_dir_file(name, filename='', dir_path=DIR_PATH, file_type='txt', max_depth=3, filter_pattern='.*',
                       exclude_pattern='__', re_special_cases=('[a-zA-Z0-9]+\.__doc__$',), ignore_basic=False,
-                      commons=('dict', ), special_cases=('__doc__',)):
+                      commons=('dict', 'str', 'int', 'float', 'list'), special_cases=('__doc__',)):
     resource = deepdir(name, max_depth=max_depth, filter_pattern=filter_pattern, exclude_pattern=exclude_pattern,
                        ignore_basic=ignore_basic, special_cases=re_special_cases)
     print(resource.size)
