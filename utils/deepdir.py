@@ -132,13 +132,14 @@ class deepdir(object):
         return len(self.result)
 
     def __call__(self, *args, **kwargs):
-        return self._DirFilter(self.result)
+        return self._DirFilter(self.result, self.name)
 
     class _DirFilter:
-        def __init__(self, iterable):
+        def __init__(self, iterable, name):
             self.__origin = iterable
             self._iterable = iterable
             self._index = 1
+            self.name = name
 
         def re_filter(self, pattern):
             self._iterable = [name for name in self._iterable if re.search(pattern, name)]
@@ -172,7 +173,8 @@ class deepdir(object):
         def commit(self):
             self.__origin = self._iterable
 
-        def save_to_json(self, filename='python_learning.json', dir_path='/Users/achen/workspaces/data_automation'):
+        def save_to_json(self, filename='', dir_path='/Users/achen/workspaces/data_automation'):
+            filename =  filename if filename else '%s.json' % self.name
             file_path = os.path.join(dir_path, filename)
             dir_details_dict = {}
             for name in self._iterable:
@@ -181,8 +183,8 @@ class deepdir(object):
                 json.dump(dir_details_dict, f)
                 print(f'写入文件完成,文件路径：{file_path},请查看!')
 
-        def save_to_txt(self, filename='python_learning.txt', dir_path='/Users/achen/workspaces/data_automation'):
-
+        def save_to_txt(self, filename='', dir_path='/Users/achen/workspaces/data_automation'):
+            filename =  filename if filename else '%s.txt' % self.name
             file_path = os.path.join(dir_path, filename)
             with open(file_path, 'w') as f:
                 for name in self._iterable:
