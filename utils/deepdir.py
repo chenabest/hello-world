@@ -148,19 +148,46 @@ class deepdir(object):
             self._iterable = [name for name in self._iterable if not re.search(pattern, name)]
             return self
 
+        def exclude_common(self, commons: list, special_cases=('__doc__',)):
+            excludes = []
+            for common in commons:
+                excludes.extend(eval('dir({})'.format(common)))
+            for case in special_cases:
+                excludes.remove(case)
+            exclude_pattern = '|'.join(excludes)
+            self.re_exclude(exclude_pattern)
+            return self
+
+        def get_result(self):
+            return self._iterable
+
         def display(self):
             for name in self._iterable:
                 print(name + ':', eval(name))
 
-        def reset(self):
+        def revert(self):
             self._iterable = self.__origin
             return self
 
-        def save(self):
+        def commit(self):
             self.__origin = self._iterable
 
-        def get_result(self):
-            return self._iterable
+        def save_to_json(self, filename='python_learning.json', dir_path='/Users/achen/workspaces/data_automation'):
+            file_path = os.path.join(dir_path, filename)
+            dir_details_dict = {}
+            for name in self._iterable:
+                dir_details_dict[name] = eval(name)
+            with open(file_path, 'w') as f:
+                json.dump(dir_details_dict, f)
+                print(f'写入文件完成,文件路径：{file_path},请查看!')
+
+        def save_to_txt(self, filename='python_learning.txt', dir_path='/Users/achen/workspaces/data_automation'):
+
+            file_path = os.path.join(dir_path, filename)
+            with open(file_path, 'w') as f:
+                for name in self._iterable:
+                    f.write(name + ':' + str(eval(name))+'\n')
+                print(f'写入文件完成,文件路径：{file_path},请查看!')
 
         def __contains__(self, item):
             return item in self._iterable
@@ -182,8 +209,8 @@ class deepdir(object):
 
         def __repr__(self):
             return '<{0.__module__}.{0.__name__}, length:{1}>'.format(type(self), len(self._iterable))
-
-
+        
+        
 dir_deep = deepdir.dir_deep
 
 
