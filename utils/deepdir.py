@@ -212,6 +212,25 @@ class deepdir(object):
         def __repr__(self):
             return '<{0.__module__}.{0.__name__}, length:{1}>'.format(type(self), len(self._iterable))
         
+       
+def generate_dir_file(name, filename='', dir_path=DIR_PATH, file_type='txt', max_depth=3, filter_pattern='.*',
+                      exclude_pattern='__', re_special_cases=('[a-zA-Z0-9]+\.__doc__$',), ignore_basic=False,
+                      commons=('dict', ), special_cases=('__doc__',)):
+    resource = deepdir(name, max_depth=max_depth, filter_pattern=filter_pattern, exclude_pattern=exclude_pattern,
+                       ignore_basic=ignore_basic, special_cases=re_special_cases)
+    print(resource.size)
+    flt = resource()
+    flt.re_filter('doc')
+    print(len(flt))
+    flt.exclude_common(commons, special_cases)
+    print(flt.size)
+    if file_type == 'txt':
+        flt.save_to_txt(filename=filename, dir_path=dir_path)
+    elif file_type == 'json':
+        flt.save_to_json(filename=filename, dir_path=dir_path)
+    else:
+        raise ValueError('不支持其他文件类型！')
+        
         
 dir_deep = deepdir.dir_deep
 
