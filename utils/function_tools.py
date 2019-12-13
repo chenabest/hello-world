@@ -29,7 +29,7 @@ def is_valid_container(content):
 
 def pretty_print(content, prefix='', is_root_container=True):
     """
-    当遇到多层嵌套复杂的数据类型的变量焦头烂额时，试试用pretty_print的方法打印下，你会豁然开朗。
+    当遇到多层嵌套复杂的数据类型的变量焦头烂额时，试试用pretty_print的方法打印下，你会一目了然，豁然开朗。
     功能：美化容器对象（列表、字典等及其任意嵌套形式）的显示，不同的元素换行显示，并自动对齐同一层元素，实际使用时一般不用传prefix和is_root_container参数
     :param content: 请传一个复杂的多层嵌套的组合数据对象
     :param prefix: 递归时使用, 用于对齐
