@@ -2,19 +2,45 @@
 # function_tools
 
 import pendulum
+import time
 import sys
 import os
 from collections import Iterable
 from traceback import print_exc
+from functools import wraps
 import re
 import string
 import keyword
 import hashlib
 import socket
 import random
+import logging
 
 PROJECT_NAME = 'data_automation'
 BASIC = ('str', 'int', 'float', 'bool', 'list', 'dict', 'tuple', 'NoneType', 'set', 'type')
+
+
+def timer(f, name=None):
+    if name is None:
+        try:
+            name = f.__name__
+        except AttributeError:
+            name = f.__class__.__name__
+
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            print(f'{name}开始...')
+            result = f(*args, **kwargs)
+            time_use = time.time() - start_time
+            if 1 <= time_use < 100:
+                time_use = round(time_use, 2)
+            elif time_use >= 100:
+                time_use = round(time_use)
+            print(f'{name}结束，耗费时间: {time_use}')
+            return result
+
+        return wrapper
 
 
 def get_valid_serial(serial=None, auto=None):
@@ -54,7 +80,8 @@ def get_valid_port(port=None, auto=True):
     hostname = socket.gethostname()
     if hostname in ["ubuntu_10_core", "hetao-automation-1"]:
         serial_port = {}
-        f = open('/Users/achen/workspaces/data_automation/appium_robot/robot/__init__.py', 'r')
+        path = get_project_path()
+        f = open(os.path.join(path, 'appium_robot/robot/__init__.py'), 'r')
         text = f.read()
         f.close()
         match = re.search('serial_port = {.*?}', text, re.DOTALL)
@@ -240,8 +267,8 @@ def pretty_print(ob, depth=1, prefix='', is_root_container=True):
                             pretty_print(ob.get(key), depth - 1, new_prefix, True)
                     except Exception as e:
                         print('未知错误:', end='')
-                        print(e)
-                        print('ob=', ob, 'key=', key)
+                        print(e.__repr__())
+                        print('ob=', ob, ', key=', key)
             else:  # 非字典型容器
                 for element in ob:
                     pretty_print(element, depth-1, prefix, False)
@@ -286,13 +313,14 @@ def show_dir(o):
     pretty_print(dir(o))
 
 
-def show_module(file_path=None, form='*', show=True):
+def show_module(file_path=None, form='*', show=True, project_name=None):
+    project_name = project_name or PROJECT_NAME
     if not file_path:
         file_path = sys.argv[0]
     if file_path:
         ls = file_path.split('/')
     for i in range(len(ls)):
-        if ls[i] == PROJECT_NAME:
+        if ls[i] == project_name:
             break
     module_name = '.'.join(ls[i + 1:])[:-3]
     if show:
@@ -325,10 +353,11 @@ def get_command():
     return command
 
 
-def get_project_path():
+def get_project_path(project_name=None):
+    project_name = project_name or PROJECT_NAME
     ls = __file__.split('/')
     for i in range(len(ls)):
-        if ls[i] == PROJECT_NAME:
+        if ls[i] == project_name:
             break
     return '/'.join(ls[:i+1])
 
@@ -418,7 +447,31 @@ def md5(ob):
     return ss
 
 
+def set_logger(log_file_path=None, output=True):
+    logger = logging.getLogger('my_logger')
+    logger.setLevel(logging.DEBUG)
+    # 定义handler的输出格式
+    formatter = logging.Formatter('%(asctime)s - %(module)s.%(funcName)s.%(lineno)d - %(levelname)s - %(message)s')
+    if log_file_path is None and output is False:
+        raise ValueError('log_file_path和output参数至少有一个为真！')
+    # 创建一个handler，用于输出到控制台：
+    if output:
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)   # 给logger添加handler
+    # 创建一个handler，用于写入日志文件：
+    if log_file_path:
+        fh = logging.FileHandler(log_file_path)
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        logger.info('I\'m log helper in python 11111111111111111111111111111111')  # 记录一条日志
+    return logger
+
+
 pprint = pretty_print
+logger_ch = set_logger()
 
 
 if __name__ == '__main__':
