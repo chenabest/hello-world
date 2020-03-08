@@ -119,16 +119,23 @@ def get_timestamp_of_next_work_start_time(hour_start: int, minute_start=0, secon
 
 
 def search(pattern, iterable, *args):
+    """
+    搜索可迭代对象中满足pattern模式的元素
+    :param pattern: 
+    :param iterable: 
+    :param args: 其他参数，当可迭代对象是字典型的时候，args[0]==0，搜索key; args[0]==1,搜索value; args[0]==2，搜索key和value
+    :return: 字典或者列表
+    """
     if 'get' not in dir(iterable):
         return [element for element in iterable if re.search(pattern, str(element))]
     else:
         if not args or args[0] == 0:
-            return {key: iterable.get(key) for key in iterable if str(iterable.get(key))}
+            return {key: iterable.get(key) for key in iterable if re.search(pattern, str(key))}
         elif args[0] == 1:
             return {key: iterable.get(key) for key in iterable if re.search(pattern, str(iterable.get(key)))}
         elif args[0] == 2:
             return {key: iterable.get(key) for key in iterable
-                    if re.search(pattern, re.search(pattern, str(key)) or str(iterable.get(key)))}
+                    if re.search(pattern, str(key)) or re.search(pattern, str(iterable.get(key)))}
         else:
             raise ValueError('第三个参数值只能是0，1，2')
 
@@ -273,7 +280,6 @@ def pretty_print(ob, depth=1, prefix='', is_root_container=True):
                 for element in ob:
                     pretty_print(element, depth-1, prefix, False)
     except Exception as e:
-        import time
         print('未知错误:', end='')
         print(e)
         # time.sleep(2)
@@ -323,6 +329,8 @@ def show_module(file_path=None, form='*', show=True, project_name=None):
         if ls[i] == project_name:
             break
     module_name = '.'.join(ls[i + 1:])[:-3]
+    if module_name.endswith('__init__'):
+        module_name = module_name[:-(len('__init__')+1)]
     if show:
         if form == 'from':
             print('from', module_name, 'import')
@@ -353,8 +361,7 @@ def get_command():
     return command
 
 
-def get_project_path(project_name=None):
-    project_name = project_name or PROJECT_NAME
+def get_project_path(project_name=PROJECT_NAME):
     ls = __file__.split('/')
     for i in range(len(ls)):
         if ls[i] == project_name:
@@ -472,6 +479,7 @@ def set_logger(log_file_path=None, output=True):
 
 pprint = pretty_print
 logger_ch = set_logger()
+PROJECT_PATH = get_project_path()
 
 
 if __name__ == '__main__':
