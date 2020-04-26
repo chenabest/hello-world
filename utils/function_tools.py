@@ -15,12 +15,15 @@ import hashlib
 import socket
 import random
 import logging
+import xlwt
+from ctypes import *
 
 PROJECT_NAME = 'data_automation'
 BASIC = ('str', 'int', 'float', 'bool', 'list', 'dict', 'tuple', 'NoneType', 'set', 'type')
 
 
 def timer(f, name=None):
+    """计时器，作为装饰器使用，被装饰的函数或方法会自动显示自身耗费时间"""
     if name is None:
         try:
             name = f.__name__
@@ -44,6 +47,12 @@ def timer(f, name=None):
 
 
 def get_valid_serial(serial=None, auto=None):
+    """
+    功能：自动检测serial是否连接到电脑，如果未连接，可以自动获取可用手机序列号
+    :param serial: 序列号
+    :param auto: 是否自动获取手机序列号
+    :return: 
+    """
     if auto is None:
         hostname = socket.gethostname()
         if hostname not in ["ubuntu_10_core", "hetao-automation-1"]:
@@ -77,6 +86,12 @@ def get_valid_serial(serial=None, auto=None):
 
 
 def get_valid_port(port=None, auto=True):
+    """
+     功能：自动检测端口号是否被占用，如果时，可以自动获取可用端口号
+    :param port: 端口号
+    :param auto: 是否自动获取可用端口号
+    :return: 
+    """
     hostname = socket.gethostname()
     if hostname in ["ubuntu_10_core", "hetao-automation-1"]:
         serial_port = {}
@@ -118,26 +133,40 @@ def get_timestamp_of_next_work_start_time(hour_start: int, minute_start=0, secon
     return timestamp
 
 
-def search(pattern, iterable, *args):
+def search(iterable, filter_pattern='.*', exclude_pattern='\.\.\.', index: int=1):
     """
-    搜索可迭代对象中满足pattern模式的元素
-    :param pattern: 
+    搜索可迭代对象中满足filter_pattern模式并且不满足exclude_pattern模式的元素
+    :param filter_pattern: 正则表达式，过滤出想要的信息
+    :param exclude_pattern: 正则表达式，在filter之后再排除一些模式
     :param iterable: 
-    :param args: 其他参数，当可迭代对象是字典型的时候，args[0]==0，搜索key; args[0]==1,搜索value; args[0]==2，搜索key和value
+    :param index: 搜索方式标号，当可迭代对象是字典型的时候，index==1，搜索key; index==2,搜索value; 
+                  index==3，搜索key和value, key或者value满足筛选条件即可
+                  index==4，搜索key和value, key和value同时满足筛选条件          
     :return: 字典或者列表
     """
     if 'get' not in dir(iterable):
-        return [element for element in iterable if re.search(pattern, str(element))]
+        return [element for element in iterable if
+                re.search(filter_pattern, str(element)) and not re.search(exclude_pattern, str(element))]
     else:
-        if not args or args[0] == 0:
-            return {key: iterable.get(key) for key in iterable if re.search(pattern, str(key))}
-        elif args[0] == 1:
-            return {key: iterable.get(key) for key in iterable if re.search(pattern, str(iterable.get(key)))}
-        elif args[0] == 2:
+        if index == 1:
+            return {key: iterable.get(key) for key in iterable if
+                    re.search(filter_pattern, str(key)) and not re.search(exclude_pattern, str(key))}
+        elif index == 2:
+            return {key: iterable.get(key) for key in iterable if
+                    re.search(filter_pattern, str(iterable.get(key))) and
+                    not re.search(exclude_pattern, str(iterable.get(key)))}
+        elif index == 3:
             return {key: iterable.get(key) for key in iterable
-                    if re.search(pattern, str(key)) or re.search(pattern, str(iterable.get(key)))}
+                    if re.search(filter_pattern, str(key)) and not re.search(exclude_pattern, str(key)) or
+                    re.search(filter_pattern, str(iterable.get(key))) and
+                    not re.search(exclude_pattern, str(iterable.get(key)))}
+        elif index == 4:
+            return {key: iterable.get(key) for key in iterable
+                    if re.search(filter_pattern, str(key)) and not re.search(exclude_pattern, str(key)) and
+                    re.search(filter_pattern, str(iterable.get(key))) and
+                    not re.search(exclude_pattern, str(iterable.get(key)))}
         else:
-            raise ValueError('第三个参数值只能是0，1，2')
+            raise ValueError('index只能是1，2，3，4')
 
 
 def is_valid_identifier(s: str):
@@ -157,6 +186,11 @@ def is_valid_identifier(s: str):
 
 
 def is_valid_container(ob):
+    """
+    判断是否为合法的容器，为_show_dir_details函数服务
+    :param ob: 对象
+    :return: 
+    """
     if ob.__class__.__name__ in ('TextIOWrapper',):
         return False
     elif isinstance(ob, str) or not isinstance(ob, Iterable):
@@ -168,6 +202,12 @@ def is_valid_container(ob):
 
 
 def is_basic(o, basic=BASIC):
+    """
+    判断对象o是否是基本类型
+    :param o: 对象
+    :param basic: 基本类型列表
+    :return: bool
+    """
     try:
         name = o.__name__.split('.')[-1]
     except AttributeError:
@@ -231,6 +271,7 @@ def _show_dir_details(name: str, depth=1, filter_pattern='.*', exclude_pattern=N
 
 def show_dir_details(o, depth=1, filter_pattern='.*', exclude_pattern=None,
                      special_cases=('[a-zA-Z0-9]+\.__doc__$',), ignore_basic=False, name=None):
+    """参见_show_dir_details"""
     if not name:
         try:
             name = o.__name__.split('.')[-1]
@@ -238,6 +279,91 @@ def show_dir_details(o, depth=1, filter_pattern='.*', exclude_pattern=None,
             name = o.__class__.__name__.split('.')[-1]
     globals().update({name: o})
     _show_dir_details(name=name, depth=depth, filter_pattern=filter_pattern, exclude_pattern=exclude_pattern, special_cases=special_cases, ignore_basic=ignore_basic)
+
+
+def show_dir_details_act_on(belong_to_object, *args, **kwargs):
+    """
+    功能：查看一个对象的所有属性和方法具体信息，并且尽可能显示方法作用于给定参数的结果
+    实例：
+    show_dir_details_act_on(inspect, pretty_print, re_exclude='__|mod_dict|getmembers|findsource|linecache|modulesbyfile|_filesbymodname|classify_class_attrs')
+    """
+    re_filter_pattern = '.*'
+    re_exclude_pattern = '\.\.\.'
+    if 'filter_pattern' in kwargs:
+        re_filter_pattern = kwargs['filter_pattern']
+        kwargs.pop('filter_pattern')
+    if 'exclude_pattern' in kwargs:
+        re_exclude_pattern = kwargs['exclude_pattern']
+        kwargs.pop('exclude_pattern')
+    if 'ob_name' in kwargs:
+        name = kwargs['ob_name']
+        kwargs.pop('ob_name')
+    else:
+        name = belong_to_object.__name__ if hasattr(belong_to_object, '__name__') else belong_to_object.__class__.__name__
+    args_str_list = list()
+    for arg in args:
+        if hasattr(arg, '__name__'):
+            args_str_list.append(arg.__name__)
+        else:
+            args_str_list.append(f"'{str(arg)}'")
+    kwargs_str_list = list()
+    for key, value in kwargs.items():
+        if hasattr(value, '__name__'):
+            kwargs_str_list.append(f'{key}={value.__name__}')
+        else:
+            kwargs_str_list.append(f"'{key}'='{str(value)}'")
+    args_str = ','.join(args_str_list)
+    kwargs_str = ','.join(kwargs_str_list)
+    param_str = ','.join([args_str, kwargs_str]).strip(',')
+    for p in dir(belong_to_object):
+        if not re.search(re_filter_pattern, p) or re.search(re_exclude_pattern, p):
+            continue
+        if eval(f'belong_to_object.{p}.__class__.__name__') in ['function', 'method', 'method_descriptor', 'builtin_function_or_method']:
+            try:
+                result = eval(f'belong_to_object.{p}(*args, **kwargs)')
+                if isinstance(result, str) and '\n' in result:
+                    result = '\n' + result
+                print(f'{name}.{p}({param_str}):', result)
+            except Exception:
+                try:
+                    result = belong_to_object.attr()
+                    print(f'{name}.{p}():', result)
+                except Exception:
+                    print(f'{name}.{p}:', eval(f'belong_to_object.{p}'))
+        else:
+            try:
+                print(f'{name}.{p}:', eval(f'belong_to_object.{p}'))
+            except Exception as e:
+                print(f'{name}.{p}出错:', e.__repr__())
+
+
+def show_details(variable_names, belong_to_ob=None, filter_pattern='.*', exclude_pattern='\.\.\.'):
+    """
+    功能：显示变量的值, 可以通过变量名过滤
+    使用实例：show_details(globals(),exclude_pattern='__|_[i0-9]|_oh|_dh|In|Out|exit|quit')
+    """
+    if belong_to_ob is not None:
+        prefix = 'belong_to_ob.'
+    else:
+        prefix = ''
+    for name in variable_names:
+        if re.search(filter_pattern, name) and not re.search(exclude_pattern, name):
+            try:
+                print(name+':', eval(prefix+name))
+            except Exception as e:
+                print(name, 'eval出错：', e.__repr__())
+
+
+def my_print(ob='', prefix='', end=None):
+    if isinstance(ob, str):
+        text = ob
+    else:
+        text = ob.__repr__()
+    text = prefix + text.replace('\n', f'\n{prefix}')
+    if end is not None:
+        print(text, end=end)
+    else:
+        print(text)
 
 
 def pretty_print(ob, depth=1, prefix='', is_root_container=True):
@@ -251,13 +377,11 @@ def pretty_print(ob, depth=1, prefix='', is_root_container=True):
     """
     try:
         if depth == 0 or not is_valid_container(ob):
-            print(prefix, end='')
-            print(ob)
+            my_print(ob, prefix=prefix)
         else:
             if not is_root_container:
-                print(prefix, end='')
                 type_name = '<' + ob.__class__.__name__ + '>'
-                print(type_name)
+                my_print(type_name, prefix)
                 prefix += ' '*(len(type_name)-1)  # 减1使与上一行最后一个字符对齐
             if 'get' in dir(ob):     # 字典型容器
                 for key in ob:
@@ -308,9 +432,9 @@ def search_globals(ob=None, filter_pattern='.*', exclude_pattern='\.\.\.', show=
     return result
 
 
-def show_globals(o=None):
-    if o is not None:
-        pretty_print(o.__globals__)
+def show_globals(ob=None):
+    if ob is not None:
+        pretty_print(ob.__globals__)
     else:
         pretty_print(globals())
 
@@ -320,15 +444,19 @@ def show_dir(o):
 
 
 def show_module(file_path=None, form='*', show=True, project_name=None):
+    """
+    将相对路径或绝对路径转化为模块，方便import
+    """
     project_name = project_name or PROJECT_NAME
     if not file_path:
         file_path = sys.argv[0]
-    if file_path:
-        ls = file_path.split('/')
+    ls = file_path.split('/')
+    index = -1
     for i in range(len(ls)):
         if ls[i] == project_name:
+            index = i
             break
-    module_name = '.'.join(ls[i + 1:])[:-3]
+    module_name = '.'.join(ls[index + 1:])[:-3]
     if module_name.endswith('__init__'):
         module_name = module_name[:-(len('__init__')+1)]
     if show:
@@ -345,6 +473,9 @@ def show_module(file_path=None, form='*', show=True, project_name=None):
 
 
 def get_run_file_name(file_path=None):
+    """
+    获取正常运行的文件的名称
+    """
     if file_path:
         return os.path.splitext(os.path.split(file_path)[-1])[0]
     else:
@@ -352,6 +483,9 @@ def get_run_file_name(file_path=None):
 
 
 def get_command():
+    """
+    获取启动脚本时命令行输入的完整命令
+    """
     run_module_name = show_module(sys.argv[0], show=False)
     if len(sys.argv) > 1:
         params_content = ' ' + ' '.join(sys.argv[1:])
@@ -361,7 +495,94 @@ def get_command():
     return command
 
 
+def get_command_on_cellphone(serial, command_only=True):
+    import json
+    result = os.popen(f'ps aux | grep {serial} | grep -v grep').read()
+    if result:
+        if command_only:
+            lines = result.split('\n')
+            commands = []
+            for line in lines:
+                if 'python' in line:
+                    ls = line.split()
+                    for i in range(len(ls)):
+                        if 'python' in ls[i]:
+                            commands.append(' '.join(ls[i:]))
+            return '\n'.join(commands)
+        else:
+            lines = result.strip('\n').split('\n')
+            return json.dumps(lines)
+    return ''
+
+
+def preparation_for_executing_command_on_cellphone(serial, port, rconn=None, wait_time=15, poll_frequency=6):
+    from utils import kill_server, start_server
+    import redis
+    rconn = rconn or redis.from_url("redis://ubuntu_10_core:6379/13", decode_responses=True)
+    command = rconn.hget(f'all_devices:{serial}', 'command')
+    while rconn.hget(f'all_devices:{serial}', 'is_available') == 'False' and command and command != get_command():
+        time.sleep(poll_frequency)
+        command = rconn.hget(f'all_devices:{serial}', 'command')
+    rconn.hset(f'all_devices:{serial}', 'is_available', 'False')
+    time.sleep(3)
+    command = rconn.hget(f'all_devices:{serial}', 'command')
+    if command == get_command() or not command:
+        kill_server(serial, get_run_file_name())
+        time.sleep(3)
+        start_server(serial, port)
+        time.sleep(wait_time)
+
+
+def switch_script_on_cellplhone_and_wait_for_availability(serial, rconn=None, wait_time=100, poll_frequency=6):
+    import redis
+    rconn = rconn or redis.from_url("redis://ubuntu_10_core:6379/13", decode_responses=True)
+    rconn.hset(f'all_devices:{serial}', 'is_available', 'True')
+    time.sleep(wait_time)
+    re_init_driver = False
+    if rconn.hget(f'all_devices:{serial}', 'is_available') == 'False':
+        command = rconn.hget(f'all_devices:{serial}', 'command')
+        while rconn.hget(f'all_devices:{serial}', 'is_available') == 'False' and command and command != get_command():
+            time.sleep(poll_frequency)
+            command = rconn.hget(f'all_devices:{serial}', 'command')
+        re_init_driver = True
+    rconn.hset(f'all_devices:{serial}', 'is_available', 'False')
+    return re_init_driver
+
+
+def size_humanize(size, unit='KB'):
+    units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    index = units.index(unit[0].upper())
+    size = float(size)
+    if size < 0:
+        raise ValueError('size必须为非负整数')
+    for unit in units[index:]:
+        if size >= 1024:
+            size /= 1024
+        else:
+            size_h = '{} {}'.format(round(size, 2), unit)
+            return size_h
+
+    size_h = '{} {}'.format(round(size, 2), units[-1])
+    return size_h
+
+
+def size_unify(size, unit='B'):
+    """统一内存单位为B"""
+    units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    index = units.index(unit[0].upper())
+    size = float(size)
+    if size < 0:
+        raise ValueError('size必须为非负整数')
+    while index > 0:
+        size *= 1024
+        index -= 1
+    return size
+
+
 def get_project_path(project_name=PROJECT_NAME):
+    """
+    获取项目路径
+    """
     ls = __file__.split('/')
     for i in range(len(ls)):
         if ls[i] == project_name:
@@ -370,6 +591,9 @@ def get_project_path(project_name=PROJECT_NAME):
 
 
 def get_module_path(ob):
+    """
+    功能：获取ob对象所在的文件路径
+    """
     try:
         class_name = ob.__class__.__name__
         if class_name == 'function':
@@ -427,6 +651,11 @@ def get_module_path(ob):
 
 
 def get_headers(text=None):
+    """
+    可将浏览器调试的请求信息文本转化成字典，作为请求的headers
+    :param text: 
+    :return: 
+    """
     if text is None:
         text = """Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
 Accept-Encoding: gzip, deflate, br
@@ -448,22 +677,22 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (
     return headers_dict
 
 
-def md5(ob):
+def my_md5(ob):
     ss = str(ob).encode(encoding='UTF-8')
     ss = hashlib.md5(ss).hexdigest()
     return ss
 
 
-def set_logger(log_file_path=None, output=True):
-    logger = logging.getLogger('my_logger')
+def set_logger(log_file_path=None, output=None, name='my_logger'):
+    logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     # 定义handler的输出格式
-    formatter = logging.Formatter('%(asctime)s - %(module)s.%(funcName)s.%(lineno)d - %(levelname)s - %(message)s')
-    if log_file_path is None and output is False:
-        raise ValueError('log_file_path和output参数至少有一个为真！')
+    formatter = logging.Formatter('%(asctime)s - %(name)s.py:%(lineno)d - %(levelname)s: %(message)s')
+    if log_file_path is None:
+        output = True
     # 创建一个handler，用于输出到控制台：
     if output:
-        ch = logging.StreamHandler()
+        ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(logging.DEBUG)
         ch.setFormatter(formatter)
         logger.addHandler(ch)   # 给logger添加handler
@@ -473,12 +702,176 @@ def set_logger(log_file_path=None, output=True):
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-        logger.info('I\'m log helper in python 11111111111111111111111111111111')  # 记录一条日志
     return logger
 
 
+def write_data_to_excel(data: list, file_name='unnamed.xls', column_name_list: list=None, encoding_mode='utf-8'):
+    from utils import ARCHIVE_PATH
+    if not file_name.endswith('.xls'):
+        file_name += '.xls'
+    file_path = file_name if file_name.startswith('/') else os.path.join(ARCHIVE_PATH, file_name)
+    work_book = xlwt.Workbook(encoding=encoding_mode)
+    sheet_name = file_name.split('/')[-1][:-4]
+    for _ in range(3):
+        if len(sheet_name) < 32:
+            break
+        print('sheet名称超过长度限制，自动裁剪')
+        sheet_name = '_'.join(sheet_name.split('_')[1:])
+    sheet = work_book.add_sheet(sheet_name)
+    if column_name_list is None:
+        column_name_list = []
+        for dic in data:
+            for key in dic:
+                if key not in column_name_list:
+                    column_name_list.append(key)
+    row = 0
+    for i, column_name in enumerate(column_name_list):
+        sheet.write(row, i, column_name)
+    for dic in data:
+        row += 1
+        for i, column_name in enumerate(column_name_list):
+            if column_name_list[i] in dic:
+                sheet.write(row, i, dic[column_name_list[i]])
+    work_book.save(file_path)
+    print(f'写入excel文件完成，文件位置：{file_path}, 请查看')
+
+
+def get_data_from_txt(file_path, headers: bool=True, sep=None):
+    """从文本文件读取格式化数据，要求文本遵循统一的格式，不同字段的值用统一分隔符隔开，一条记录占一行，如果有表头的话，请放在第一行"""
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    if headers:
+        headers = lines[0].split(sep)
+    else:
+        headers = list(range(1, len(lines[0].split(sep))+1))
+    n = len(headers)
+    data = []
+    for line in lines[1:]:
+        dic = dict()
+        record = line.split(sep)
+        if not record:
+            # 跳过空行
+            continue
+        for i in range(n):
+            dic[headers[i]] = record[i]
+        data.append(dic)
+    return data
+
+
+def all_in(items, container):
+    for item in items:
+        if item not in container:
+            return False
+    return True
+
+
+def any_in(items, container):
+    for item in items:
+        if item in container:
+            return True
+    return False
+
+
+def a_input(prompt='', default='', timeout=30):
+    """
+    get input from terminal asynchronously
+    :param prompt: 输入说明文字
+    :param default: 超时且未输入任何字符时的默认返回值
+    :param timeout: 静默超时时间（在timeout时间内未输入任何文字，自动return）
+    :return: str
+    """
+    from appium_robot.robot.tools.key_getter import KeyGetter
+    print(prompt, end='', flush=True)
+    with KeyGetter() as k:
+        start_time = time.time()
+        s = ''
+        while True:
+            if time.time() - start_time > timeout:
+                break
+            char = k.getchar(False)
+            if char in ['\n', '\r']:
+                return s or default
+            elif char:
+                if char == '\x7f':   # 删除键
+                    if len(s) >= 1:
+                        s = s[:-1]
+                else:
+                    s += char
+                start_time = time.time()
+            else:
+                time.sleep(0.0005)
+        print()
+        return s or default
+
+
+def ssh_command(command, user='ubuntu', host='ubuntu_10_core', password='420blazeit', has_added_key=True):
+    """
+    使用ssh登录远程服务器执行command
+    :param command: 要在服务器执行的命令
+    :param user: 服务器用户名
+    :param host: 服务器域名或ip
+    :param password: 密码
+    :param has_added_key: 是否把自己的公钥添加到了服务器上
+    :return: 命令的的输出内容
+    """
+    import pexpect
+    if has_added_key:
+        child = pexpect.spawn('''ssh -l %s %s "%s"''' % (user, host, command))
+    else:
+        ssh_new_key = 'Are you sure you want to continue connecting'
+        child = pexpect.spawn('''ssh -l %s %s "%s"''' % (user, host, command))
+        i = child.expect([pexpect.TIMEOUT, ssh_new_key, 'password: '])
+        # import ipdb
+        # ipdb.set_trace()
+        if i == 0:
+            print('ERROR!')
+            print('SSH could not login. Here is what SSH said:')
+            print(child.before, child.after)
+            return None
+        if i == 1:
+            child.sendline('yes')
+            child.expect('password: ')
+            i = child.expect([pexpect.TIMEOUT, 'password: '])
+            if i == 0:
+                print('ERROR!')
+                print('SSH could not login. Here is what SSH said:')
+                print(child.before, child.after)
+                return None
+        child.sendline(password)
+    child.expect(pexpect.EOF)
+    return child.before.decode()
+
+
+def domain2ip(domain_name):
+    text = os.popen(f'ping {domain_name} -c 1').read()
+    match = re.search('(\d+\.){3}\d+', text)
+    if match:
+        return match.group()
+
+
+def ip2domain(ip):
+    text = os.popen(f'nslookup {ip}').read()
+    match = re.search('name\s*=\s*(\S+)', text)
+    if match:
+        return match.group(1).strip('.')
+
+
+def is_port_available(port, host="127.0.0.1"):
+    """检测端口是否被占用"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((host, int(port)))
+        s.shutdown(2)
+        print('port %s is uesd !' % port)
+        return False
+    except Exception as e:
+        print(e.__repr__())
+        print('port %s is available!' % port)
+        return True
+
+
 pprint = pretty_print
-logger_ch = set_logger()
+logger_ch = set_logger(output=True)
 PROJECT_PATH = get_project_path()
 
 
@@ -487,7 +880,7 @@ if __name__ == '__main__':
     a = [1, 2, {'a22': 67, 'fff': 9.09}, 89293488989, [1, 2, (6, 'ff', 9)], 45, 'helloworld']
     pretty_print(a)
     # show_dir_details(dict, depth=3, exclude_pattern='__|._', ignore_basic=('str', 'int', 'float', 'bool'))
-    import ipdb
-    ipdb.set_trace()
+    # import ipdb
+    # ipdb.set_trace()
     # import numpy
     # show_dir_details(numpy)
