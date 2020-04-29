@@ -251,7 +251,7 @@ class DataFilterBase(object):
     def order_by(self, key, reverse=False):
         self.data.sort(key=key, reverse=reverse)
 
-    def display(self, fields: list=None, hide_fields=None, default='', limit=None):
+    def display(self, fields: list=None, hide_fields=None, default='', limit=None, width_limit=100, blank_line_between_records=False):
         """
         展示数据
         :return: 
@@ -268,7 +268,6 @@ class DataFilterBase(object):
         if hide_fields:
             for field in hide_fields:
                 fields.remove(field)
-        field_width = dict()
         data = list()
         data.append(fields)
         if limit is None:
@@ -277,14 +276,21 @@ class DataFilterBase(object):
             start_index, end_index = 0, limit
         else:
             start_index, end_index = limit
+        field_width = dict()
         for record in self.data[start_index: end_index]:
-            data.append([record.get(field, default) for field in fields])
-        for field in fields:
-            field_width[field] = max(len(field), self.field_max(field, key=lambda x: ww(str(x)), default=0)) + 2
+            data.append([])
+            for field in fields:
+                value = record.get(field, default)
+                data[-1].append(value)
+                width = ww(str(value))
+                if width > field_width.get(field, ww(str(field))):
+                    field_width[field] = min(width, width_limit)
         for record in data:
             for i in range(len(fields)):
-                print(str(record[i]) + ' ' * (field_width[fields[i]]-ww(str(record[i]))), end=' ')
+                print(str(record[i]) + ' ' * (field_width.get(fields[i], ww(str(fields[i])))-ww(str(record[i]))), end=' '*3)
             print()
+            if blank_line_between_records:
+                print()
 
     def commit(self):
         """
